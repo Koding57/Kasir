@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplikasi Kasir Offline</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    padding: 20px;
+}
+h1 { text-align: center; }
+.container {
+    max-width: 650px;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+select, input, button {
+    padding: 8px;
+    margin: 5px 0;
+    width: 100%;
+}
+table {
+    width: 100%;
+    margin-top: 10px;
+    border-collapse: collapse;
+}
+table, th, td { border: 1px solid #ccc; }
+th, td { padding: 8px; text-align: center; }
+.total { font-weight: bold; }
+
+button {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+}
+button:hover { background-color: #218838; }
+
+.struk {
+    margin-top: 20px;
+    background: #eee;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Print */
+@media print {
+    body * { visibility: hidden; }
+    .struk, .struk * { visibility: visible; }
+    .struk {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: white;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>🛒 Kasir sederhana</h1>
+
+<label>Pilih Barang:</label>
+<select id="barang"></select>
+
+<label>Jumlah:</label>
+<input type="number" id="jumlah" min="1" value="1">
+
+<button onclick="tambahBarang()">Tambah</button>
+
+<table>
+<thead>
+<tr>
+<th>Barang</th>
+<th>Jumlah</th>
+<th>Subtotal</th>
+<th>Hapus</th>
+</tr>
+</thead>
+<tbody id="keranjang"></tbody>
+</table>
+
+<p class="total">Total: Rp <span id="total">0</span></p>
+
+<label>Uang Bayar:</label>
+<input type="number" id="bayar">
+
+<button onclick="hitungKembalian()">Bayar</button>
+<button onclick="cetakStruk()">🖨️ Cetak</button>
+<button onclick="resetKasir()">🔄 Reset</button>
+
+<hr>
+
+<h3>➕ Tambah Barang</h3>
+
+<input type="text" id="namaBaru" placeholder="Nama barang">
+<input type="number" id="hargaBaru" placeholder="Harga">
+
+<button onclick="tambahBarangBaru()">Tambah Barang</button>
+<button onclick="hapusBarangDaftar()">🗑️ Hapus Barang</button>
+
+<div class="struk" id="struk"></div>
+</div>
+
+<script>
+let hargaBarang = JSON.parse(localStorage.getItem("hargaBarang")) || {
+    roti: 5000,
+    air: 3000,
+    cokelat: 7000
+};
+
+let keranjang = JSON.parse(localStorage.getItem("keranjang")) || {};
+let total = 0;
+
+window.onload = () => {
+    updateDropdown();
+    updateKeranjang();
+};
+
+function updateDropdown() {
+    const select = document.getElementById("barang");
+    select.innerHTML = "";
+
+    for (let item in hargaBarang) {
+        const option = document.createElement("option");
+        option.value = item;
+        option.text = `${item} - Rp ${format(hargaBarang[item])}`;
+        select.appendChild(option);
+    }
+}
+
+function format(angka) {
+    return angka.toLocaleString("id-ID");
+}
+
+function tambahBarang() {
+    const nama = barang.value;
+    const jumlah = parseInt(document.getElementById("jumlah").value);
+
+    if (!jumlah || jumlah <= 0) return alert("Jumlah tidak valid");
+
+    keranjang[nama] = (keranjang[nama] || 0) + jumlah;
+
+    simpan();
+    updateKeranjang();
+}
+
+function updateKeranjang() {
+    const tbody = document.getElementById("keranjang");
+    tbody.innerHTML = "";
+    total = 0;
+
+    for (let item in keranjang) {
+        let subtotal = hargaBarang[item] * keranjang[item];
+        total += subtotal;
+
+        tbody.innerHTML += `
+        <tr>
+            <td>${item}</td>
+            <td>${keranjang[item]}</td>
+            <td>Rp ${format(subtotal)}</td>
+            <td>
+                <button onclick="hapusItem('${item}')" style="background:red;">❌</button>
+            </td>
+        </tr>`;
+    }
+
+    document.getElementById("total").innerText = format(total);
+}
+
+function hapusItem(item) {
+    delete keranjang[item];
+    simpan();
+    updateKeranjang();
+}
+
+function hitungKembalian() {
+    const bayar = parseInt(document.getElementById("bayar").value);
+
+    if (!bayar || bayar < total) return alert("Uang kurang!");
+
+    let kembalian = bayar - total;
+    let tanggal = new Date().toLocaleString();
+
+    struk.innerHTML = `
+    <h3>STRUK</h3>
+    <p>${tanggal}</p>
+    ${Object.keys(keranjang).map(i =>
+        `<p>${i} x${keranjang[i]} = Rp ${format(hargaBarang[i]*keranjang[i])}</p>`
+    ).join("")}
+    <hr>
+    <p>Total: Rp ${format(total)}</p>
+    <p>Bayar: Rp ${format(bayar)}</p>
+    <p>Kembalian: Rp ${format(kembalian)}</p>
+    `;
+}
+
+function cetakStruk() {
+    if (total === 0) return alert("Belum ada transaksi");
+    window.print();
+}
+
+function resetKasir() {
+    keranjang = {};
+    localStorage.removeItem("keranjang");
+    updateKeranjang();
+    struk.innerHTML = "";
+    bayar.value = "";
+}
+
+function tambahBarangBaru() {
+    let nama = namaBaru.value.toLowerCase();
+    let harga = parseInt(hargaBaru.value);
+
+    if (!nama || !harga) return alert("Isi dengan benar");
+
+    hargaBarang[nama] = harga;
+    simpanBarang();
+    updateDropdown();
+
+    namaBaru.value = "";
+    hargaBaru.value = "";
+}
+
+function hapusBarangDaftar() {
+    let nama = prompt("Nama barang?");
+    if (!nama) return;
+
+    nama = nama.toLowerCase();
+
+    delete hargaBarang[nama];
+    delete keranjang[nama];
+
+    simpanBarang();
+    simpan();
+
+    updateDropdown();
+    updateKeranjang();
+}
+
+function simpan() {
+    localStorage.setItem("keranjang", JSON.stringify(keranjang));
+}
+
+function simpanBarang() {
+    localStorage.setItem("hargaBarang", JSON.stringify(hargaBarang));
+}
+</script>
+
+</body>
+</html>
